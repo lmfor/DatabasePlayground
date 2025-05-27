@@ -4,8 +4,9 @@ from fastapi import Depends, Body
 # from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from database import SessionLocal, engine, Base
-from models import City
+from models import City as CityORM
 from typing import List
+from schemas import CityCreate, CityRead
 # import database
 
 
@@ -27,6 +28,7 @@ def get_db():
 origins = [
     "http://localhost:8000"
 ]
+'''
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,22 +37,22 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-'''
+
 
 
 @app.get("/")
 def read_root():
     return {"ROOT" : "PAGE"}
 
-@app.get("/cities")
+@app.get("/cities", response_model=List[CityRead])
 def get_cities(db : Session = Depends(get_db)):
-    return db.query(City).all() 
+    return db.query(CityORM).all() 
 
 @app.post("/cities")
 #            Body just means dont look at /cities?name=&country= in the URL. It will look at the body of the POST request
 #                                  BODY --> raw --> JSON
-def create_city(name: str=Body(...), country: str=Body(...), db: Session = Depends(get_db)):
-    city = City(name=name,country=country)
+def create_city(name: str=Body(...), country: str=Body(...), db: Session = Depends(get_db), response_model=CityRead):
+    city = CityORM(name=name,country=country)
     db.add(city)
     db.commit() # city ID is still non-existent at this point
     db.refresh(city) # refresh() will update the city object with the ID assigned by the database
@@ -58,8 +60,8 @@ def create_city(name: str=Body(...), country: str=Body(...), db: Session = Depen
 
 # note that when using PUT, the entire object is replaced and thus gets moved to the lowest row. It retains its ID number though.
 @app.put("/cities/{city_id}")
-def replace_city(city_id: int, name: str = Body(...), country: str = Body(...), db: Session = Depends(get_db)):
-    city = db.query(City).filter(City.id == city_id).first()
+def replace_city(city_id: int, name: str = Body(...), country: str = Body(...), db: Session = Depends(get_db), response_model=CityRead):
+    city = db.query(CityORM).filter(CityORM.id == city_id).first()
     if not city:
         raise HTTPException(status_code=404, detail=f"({city_id}) City not found")
     city.name = name        #type: ignore
@@ -69,8 +71,8 @@ def replace_city(city_id: int, name: str = Body(...), country: str = Body(...), 
     return city
 
 @app.patch("/cities/{city_id}")
-def update_city(city_id: int, name: str = Body(None), country: str = Body(None), db: Session = Depends(get_db)):
-    city = db.query(City).filter(City.id == city_id).first()
+def update_city(city_id: int, name: str = Body(None), country: str = Body(None), db: Session = Depends(get_db), response_model=CityRead):
+    city = db.query(CityORM).filter(CityORM.id == city_id).first()
     if not city:
         raise HTTPException(status_code=404, detail=f"({city_id}) City not found")
     if name is not None:
@@ -92,8 +94,8 @@ URL: http://localhost:8000/cities/5
 
 
 @app.delete("/cities/{city_id}")
-def delete_city(city_id: int, db: Session = Depends(get_db)):
-    deleted_city = db.query(City).filter(City.id == city_id).first()
+def delete_city(city_id: int, db: Session = Depends(get_db), response_model=CityRead):
+    deleted_city = db.query(CityORM).filter(CityORM.id == city_id).first()
     if not deleted_city:
         raise HTTPException(status_code=404, detail=f"({deleted_city}) City not found")
     db.delete(deleted_city)
